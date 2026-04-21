@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Projects//**)",
+      "Read(//c/Projects/**)",
+      "Read(//c/Program Files/nodejs//**)",
+      "Read(//c/Users/bcnvb/AppData/Roaming/**)",
+      "Bash(cmd.exe /c \"where node\")",
+      "Bash(cmd.exe /c \"where npm\")",
+      "Bash(export PATH=\"/c/Program Files/nodejs:$PATH\")",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(curl -s -o /tmp/home.html -w \"Status: %{http_code} Time: %{time_total}s\\\\n\" --max-time 45 http://localhost:3000/)",
+      "Read(//tmp/**)",
+      "Bash(curl -s -o /tmp/search.html -w \"Status: %{http_code} Time: %{time_total}s\\\\n\" --max-time 45 \"http://localhost:3000/search?q=naruto\")",
+      "Bash(curl -s -o /tmp/detail.html -w \"Status: %{http_code} Time: %{time_total}s\\\\n\" --max-time 60 http://localhost:3000/anime/16498)",
+      "Bash(node test-consumet.mjs)",
+      "Bash(node test-stream.mjs)",
+      "Bash(npx tsc *)",
+      "Bash(npm view *)",
+      "Bash(curl -sI https://animepahe.si)",
+      "Bash(curl -sI https://anikai.to)",
+      "Bash(curl -sI https://kickass-anime.ru)"
+    ]
+  }
+}

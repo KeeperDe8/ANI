@@ -1,0 +1,71 @@
+export type Title = {
+  romaji?: string;
+  english?: string;
+  native?: string;
+  userPreferred?: string;
+};
+
+export type AnimeSummary = {
+  id: string;
+  malId?: number;
+  title: Title | string;
+  image?: string;
+  cover?: string;
+  description?: string;
+  status?: string;
+  rating?: number;
+  releaseDate?: number | string;
+  type?: string;
+  color?: string;
+  totalEpisodes?: number;
+};
+
+export type Episode = {
+  id: string;
+  number: number;
+  title?: string;
+  image?: string;
+  description?: string;
+  url?: string;
+};
+
+export type AnimeInfo = AnimeSummary & {
+  genres?: string[];
+  studios?: string[];
+  season?: string;
+  duration?: number;
+  episodes?: Episode[];
+  synonyms?: string[];
+  isAdult?: boolean;
+  nextAiringEpisode?: { episode: number; airingTime: number; timeUntilAiring: number };
+};
+
+export type StreamSource = {
+  url: string;
+  quality?: string;
+  isM3U8?: boolean;
+};
+
+export type StreamSubtitle = {
+  url: string;
+  lang: string;
+};
+
+export type WatchResponse = {
+  headers?: Record<string, string>;
+  sources: StreamSource[];
+  subtitles?: StreamSubtitle[];
+  download?: string;
+};
+
+export type SearchResponse = {
+  currentPage?: number;
+  hasNextPage?: boolean;
+  results: AnimeSummary[];
+};
+
+export function displayTitle(t: Title | string | undefined): string {
+  if (!t) return "Untitled";
+  if (typeof t === "string") return t;
+  return t.english || t.romaji || t.userPreferred || t.native || "Untitled";
+}

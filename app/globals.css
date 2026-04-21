@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html, body {
+  background: #0b0b10;
+  color: #e8e8f0;
+}
+
+body {
+  min-height: 100vh;
+}
+
+/* Hide scrollbar for horizontal anime rows */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }
