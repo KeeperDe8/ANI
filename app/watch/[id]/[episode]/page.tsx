@@ -148,6 +148,7 @@ async function PlayerShell({
       episodeNumber={episodeNumber}
       initialSources={watchData.sources}
       initialReferer={watchData.headers?.Referer}
+      initialSubtitles={watchData.subtitles}
       poster={poster}
     />
   );
