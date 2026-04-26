@@ -1,14 +1,14 @@
-export type ProviderKey = "auto" | "animekai" | "animepahe" | "kickassanime";
+export type ProviderKey = "auto" | "animeunity" | "animekai" | "kickassanime";
 
 export const PROVIDERS: { key: ProviderKey; label: string }[] = [
   { key: "auto", label: "Auto" },
+  { key: "kickassanime", label: "KickAssAnime" },
+  { key: "animeunity", label: "AnimeUnity" },
   { key: "animekai", label: "AnimeKai" },
-  { key: "animepahe", label: "AnimePahe" },
-  { key: "kickassanime", label: "KickAss" },
 ];
 
 export const REAL_PROVIDERS: Exclude<ProviderKey, "auto">[] = [
-  "animekai",
-  "animepahe",
   "kickassanime",
+  "animeunity",
+  "animekai",
 ];

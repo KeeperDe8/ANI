@@ -7,14 +7,75 @@
 }
 
 html, body {
-  background: #0b0b10;
+  background: #0a0a0f;
   color: #e8e8f0;
 }
 
 body {
   min-height: 100vh;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
 
-/* Hide scrollbar for horizontal anime rows */
+/* Hide scrollbar for horizontal rows */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { scrollbar-width: none; }
+
+/* Custom scrollbar for vertical content */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #23232f;
+  border-radius: 5px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3a3a4a;
+}
+
+/* Smooth horizontal scroll for rows */
+.snap-row {
+  scroll-snap-type: x mandatory;
+  scroll-padding: 1rem;
+}
+.snap-row > * {
+  scroll-snap-align: start;
+}
+
+/* Hero text shadow for legibility over images */
+.hero-text {
+  text-shadow: 0 2px 20px rgba(0, 0, 0, 0.6);
+}
+
+/* Aspect ratios for backdrop content */
+.aspect-hero {
+  aspect-ratio: 21 / 9;
+}
+
+@media (max-width: 768px) {
+  .aspect-hero {
+    aspect-ratio: 16 / 11;
+  }
+}
+
+/* Subtle gradient borders */
+.gradient-border {
+  position: relative;
+  background: linear-gradient(#15151c, #15151c) padding-box,
+              linear-gradient(135deg, #8b5cf6 0%, transparent 50%) border-box;
+  border: 1px solid transparent;
+}
+
+/* Loading shimmer */
+@keyframes shimmer {
+  0% { background-position: -1000px 0; }
+  100% { background-position: 1000px 0; }
+}
+.shimmer {
+  background: linear-gradient(90deg, #15151c 0%, #1c1c26 50%, #15151c 100%);
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite linear;
+}

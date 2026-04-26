@@ -16,9 +16,9 @@ export default async function HomePage() {
   }
 
   return (
-    <div className="py-6">
+    <div>
       {error && (
-        <div className="max-w-7xl mx-auto px-4 mb-6 p-3 rounded border border-red-900 bg-red-950/40 text-red-200 text-sm">
+        <div className="max-w-7xl mx-auto px-4 lg:px-6 mt-6 mb-6 p-4 rounded-lg border border-red-900/50 bg-red-950/30 text-red-200 text-sm">
           <strong>Provider unreachable.</strong>
           <div className="mt-1 text-xs opacity-70">{error}</div>
         </div>

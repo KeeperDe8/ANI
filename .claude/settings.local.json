@@ -20,7 +20,29 @@
       "Bash(npm view *)",
       "Bash(curl -sI https://animepahe.si)",
       "Bash(curl -sI https://anikai.to)",
-      "Bash(curl -sI https://kickass-anime.ru)"
+      "Bash(curl -sI https://kickass-anime.ru)",
+      "Read(//c/Users/bcnvb/Downloads/**)",
+      "Bash(unzip -l \"ANI Design System.zip\")",
+      "Bash(grep -c \"^.*/$\")",
+      "WebFetch(domain:api.jikan.moe)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:jikan.docs.apiary.io)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebSearch",
+      "WebFetch(domain:docs.jikan.moe)",
+      "WebFetch(domain:jikan.moe)",
+      "Bash(node *)",
+      "Bash(xargs grep *)",
+      "Bash(xargs cat *)",
+      "Bash(npx @consumet/api --version)",
+      "Bash(npx playwright *)",
+      "Bash(curl -s -A \"Mozilla/5.0\" \"https://api.github.com/repos/aniyomiorg/aniyomi-extensions/git/trees/main?recursive=0\")",
+      "Bash(curl -s -A \"Mozilla/5.0\" \"https://api.github.com/repos/jmir1/aniyomi-extensions/git/trees/master?recursive=0\")",
+      "Bash(curl -s \"http://localhost:3000/api/watch?id=16498&episode=1&provider=kickassanime\")",
+      "Bash(curl -s \"http://localhost:3000/api/stream?url=https%3A%2F%2Fhls.krussdomi.com%2Fmanifest%2F664dfa1bb97399e0e13aa5cf%2Fmaster.m3u8&referer=https%3A%2F%2Fkrussdomi.com%2F\")",
+      "Bash(npx kill-port *)",
+      "Bash(netstat -ano)",
+      "Bash(findstr :3000)"
     ]
   }
 }

@@ -29,6 +29,21 @@ export type Episode = {
   url?: string;
 };
 
+export type VoiceActor = {
+  id?: number;
+  language?: string;
+  name?: { first?: string; last?: string; full?: string; native?: string };
+  image?: string;
+};
+
+export type Character = {
+  id?: number;
+  role?: string;
+  name?: { first?: string; last?: string; full?: string; native?: string };
+  image?: string;
+  voiceActors?: VoiceActor[];
+};
+
 export type AnimeInfo = AnimeSummary & {
   genres?: string[];
   studios?: string[];
@@ -37,6 +52,10 @@ export type AnimeInfo = AnimeSummary & {
   episodes?: Episode[];
   synonyms?: string[];
   isAdult?: boolean;
+  characters?: Character[];
+  recommendations?: AnimeSummary[];
+  relations?: AnimeSummary[];
+  trailer?: { id?: string; site?: string; thumbnail?: string };
   nextAiringEpisode?: { episode: number; airingTime: number; timeUntilAiring: number };
 };
 
@@ -68,4 +87,9 @@ export function displayTitle(t: Title | string | undefined): string {
   if (!t) return "Untitled";
   if (typeof t === "string") return t;
   return t.english || t.romaji || t.userPreferred || t.native || "Untitled";
+}
+
+export function characterName(c: Character): string {
+  if (!c.name) return "Unknown";
+  return c.name.full || [c.name.first, c.name.last].filter(Boolean).join(" ") || c.name.native || "Unknown";
 }

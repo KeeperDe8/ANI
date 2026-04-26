@@ -19,10 +19,22 @@ export async function GET(req: NextRequest) {
 
   const headers: Record<string, string> = {
     "User-Agent":
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36",
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
     Accept: "*/*",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Sec-Fetch-Dest": "empty",
+    "Sec-Fetch-Mode": "cors",
+    "Sec-Fetch-Site": "cross-site",
   };
-  if (referer) headers["Referer"] = referer;
+  if (referer) {
+    headers["Referer"] = referer;
+    try {
+      headers["Origin"] = new URL(referer).origin;
+    } catch {
+      // ignore malformed referer
+    }
+  }
 
   let upstream: Response;
   try {
@@ -36,6 +48,7 @@ export async function GET(req: NextRequest) {
   }
 
   const contentType = upstream.headers.get("content-type") || "";
+  const isVtt = decoded.pathname.endsWith(".vtt") || contentType.includes("text/vtt");
   const isPlaylist =
     decoded.pathname.endsWith(".m3u8") ||
     contentType.includes("mpegurl") ||
@@ -49,6 +62,19 @@ export async function GET(req: NextRequest) {
       headers: {
         "Content-Type": "application/vnd.apple.mpegurl",
         "Cache-Control": "no-store",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  }
+
+  // Subtitle VTT — must serve as text/vtt for <track> elements.
+  if (isVtt) {
+    const text = await upstream.text();
+    return new NextResponse(text, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/vtt; charset=utf-8",
+        "Cache-Control": "public, max-age=3600",
         "Access-Control-Allow-Origin": "*",
       },
     });
@@ -74,8 +100,8 @@ function rewritePlaylist(text: string, baseUrl: URL, referer: string): string {
       const trimmed = line.trim();
       if (!trimmed) return line;
 
-      // Rewrite #EXT-X-KEY URI="..."
-      if (trimmed.startsWith("#EXT-X-KEY") || trimmed.startsWith("#EXT-X-MAP")) {
+      // Rewrite URI="..." in any tag that has one (KEY, MAP, MEDIA, etc.)
+      if (trimmed.startsWith("#") && trimmed.includes('URI="')) {
         return line.replace(/URI="([^"]+)"/g, (_m, uri) => {
           const abs = absolutize(uri, baseUrl);
           return `URI="/api/stream?url=${encodeURIComponent(abs)}${refParam}"`;

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Hls from "hls.js";
 import type { StreamSource, StreamSubtitle } from "@/lib/types";
 import { PROVIDERS, type ProviderKey } from "@/lib/providers";
+import { saveProgress, snapshotFromAnime } from "@/lib/progress";
 
 type SubStyle = {
   fontSize: "sm" | "md" | "lg" | "xl";
@@ -26,6 +27,7 @@ const COLOR_HEX = { white: "#fff", yellow: "#ffeb3b", cyan: "#00e5ff" };
 const BG_RGBA = { none: "rgba(0,0,0,0)", half: "rgba(0,0,0,0.55)", full: "rgba(0,0,0,0.9)" };
 
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
+const PROGRESS_SAVE_INTERVAL_MS = 5000;
 
 function onlyEnglish(subs: StreamSubtitle[] = []): StreamSubtitle[] {
   return subs.filter(
@@ -39,23 +41,36 @@ export default function VideoPlayer({
   initialSources,
   initialReferer,
   initialSubtitles,
+  initialProvider,
   poster,
   serverOnly = false,
+  animeTitle,
+  animeImage,
+  animeCover,
+  totalEpisodes,
+  episodeTitle,
 }: {
   animeId: string;
   episodeNumber: number;
   initialSources: StreamSource[];
   initialReferer?: string;
   initialSubtitles?: StreamSubtitle[];
+  initialProvider?: ProviderKey;
   poster?: string;
   serverOnly?: boolean;
+  animeTitle?: string;
+  animeImage?: string;
+  animeCover?: string;
+  totalEpisodes?: number;
+  episodeTitle?: string;
 }) {
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const hlsRef = useRef<Hls | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const lastSavedRef = useRef<number>(0);
 
-  const [provider, setProvider] = useState<ProviderKey>("animekai");
+  const [provider, setProvider] = useState<ProviderKey>(initialProvider ?? "kickassanime");
   const [sources, setSources] = useState<StreamSource[]>(initialSources);
   const [referer, setReferer] = useState<string | undefined>(initialReferer);
   const [subtitles, setSubtitles] = useState<StreamSubtitle[]>(onlyEnglish(initialSubtitles));
@@ -67,13 +82,30 @@ export default function VideoPlayer({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [subStyle, setSubStyle] = useState<SubStyle>(() => loadJSON("ani:substyle", SUB_STYLE_DEFAULT));
-  const [toggles, setToggles] = useState<Toggles>(() => loadJSON("ani:toggles", TOGGLES_DEFAULT));
+  const [hlsLevels, setHlsLevels] = useState<{ height: number; bitrate: number }[]>([]);
+  const [hlsLevel, setHlsLevel] = useState<number>(-1);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const [subStyle, setSubStyle] = useState<SubStyle>(SUB_STYLE_DEFAULT);
+  const [toggles, setToggles] = useState<Toggles>(TOGGLES_DEFAULT);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuTab, setMenuTab] = useState<"quality" | "speed" | "sub">("quality");
+  const [hydrated, setHydrated] = useState(false);
 
-  useEffect(() => { saveJSON("ani:substyle", subStyle); }, [subStyle]);
-  useEffect(() => { saveJSON("ani:toggles", toggles); }, [toggles]);
+  useEffect(() => {
+    setSubStyle(loadJSON("ani:substyle", SUB_STYLE_DEFAULT));
+    setToggles(loadJSON("ani:toggles", TOGGLES_DEFAULT));
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => { if (hydrated) saveJSON("ani:substyle", subStyle); }, [hydrated, subStyle]);
+  useEffect(() => { if (hydrated) saveJSON("ani:toggles", toggles); }, [hydrated, toggles]);
+
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
 
   // Close menu on outside click
   useEffect(() => {
@@ -131,10 +163,16 @@ export default function VideoPlayer({
     const isM3U8 = src.isM3U8 ?? src.url.includes(".m3u8");
 
     if (isM3U8 && Hls.isSupported()) {
+      setHlsLevels([]);
+      setHlsLevel(-1);
       const hls = new Hls({ enableWorker: true, lowLatencyMode: false });
       hls.loadSource(proxied);
       hls.attachMedia(video);
       hlsRef.current = hls;
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        setHlsLevels(hls.levels.map((l) => ({ height: l.height, bitrate: l.bitrate })));
+        setHlsLevel(-1);
+      });
       hls.on(Hls.Events.ERROR, (_evt, data) => {
         if (data.fatal) console.error("HLS fatal error:", data);
       });
@@ -155,43 +193,117 @@ export default function VideoPlayer({
     if (v) v.playbackRate = speed;
   }, [speed, src]);
 
+  // Resume playback from saved progress, auto-skip intro, autoplay
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
     const onLoaded = () => {
-      if (toggles.autoSkipIntro && v.currentTime < 5 && v.duration > 120) {
-        v.currentTime = 85;
-      }
+      // Resume from progress (overrides auto-skip if applicable)
+      try {
+        const all = JSON.parse(localStorage.getItem("ani:progress") || "{}");
+        const entry = all[`${animeId}:${episodeNumber}`];
+        if (entry && entry.currentTime > 5 && entry.currentTime < v.duration - 30) {
+          v.currentTime = entry.currentTime;
+        } else if (toggles.autoSkipIntro && v.currentTime < 5 && v.duration > 120) {
+          v.currentTime = 85;
+        }
+      } catch {}
+
       if (toggles.autoPlay) v.play().catch(() => {});
     };
     v.addEventListener("loadedmetadata", onLoaded);
     return () => v.removeEventListener("loadedmetadata", onLoaded);
-  }, [toggles.autoPlay, toggles.autoSkipIntro, src]);
+  }, [toggles.autoPlay, toggles.autoSkipIntro, src, animeId, episodeNumber]);
 
+  // Auto-next on ended + final save at 100%
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
     const onEnded = () => {
+      // Save final position so the entry is naturally pruned (>= 95%)
+      if (animeTitle) {
+        saveProgress(
+          snapshotFromAnime(
+            { id: animeId, title: animeTitle, image: animeImage, cover: animeCover, totalEpisodes },
+            episodeNumber,
+            v.duration,
+            v.duration,
+            episodeTitle
+          )
+        );
+      }
       if (toggles.autoNext) router.push(`/watch/${animeId}/${episodeNumber + 1}`);
     };
     v.addEventListener("ended", onEnded);
     return () => v.removeEventListener("ended", onEnded);
-  }, [toggles.autoNext, animeId, episodeNumber, router]);
+  }, [toggles.autoNext, animeId, episodeNumber, router, animeTitle, animeImage, animeCover, totalEpisodes, episodeTitle]);
 
+  // Save progress every 5 seconds during playback
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v || !animeTitle) return;
+
+    const onTimeUpdate = () => {
+      const now = Date.now();
+      if (now - lastSavedRef.current < PROGRESS_SAVE_INTERVAL_MS) return;
+      if (!v.duration || isNaN(v.duration)) return;
+      if (v.currentTime < 3) return; // skip the initial seek
+      lastSavedRef.current = now;
+      saveProgress(
+        snapshotFromAnime(
+          { id: animeId, title: animeTitle, image: animeImage, cover: animeCover, totalEpisodes },
+          episodeNumber,
+          v.currentTime,
+          v.duration,
+          episodeTitle
+        )
+      );
+    };
+
+    const onPause = () => {
+      if (!v.duration || v.currentTime < 3) return;
+      saveProgress(
+        snapshotFromAnime(
+          { id: animeId, title: animeTitle, image: animeImage, cover: animeCover, totalEpisodes },
+          episodeNumber,
+          v.currentTime,
+          v.duration,
+          episodeTitle
+        )
+      );
+    };
+
+    v.addEventListener("timeupdate", onTimeUpdate);
+    v.addEventListener("pause", onPause);
+    window.addEventListener("beforeunload", onPause);
+    return () => {
+      v.removeEventListener("timeupdate", onTimeUpdate);
+      v.removeEventListener("pause", onPause);
+      window.removeEventListener("beforeunload", onPause);
+    };
+  }, [animeId, animeTitle, animeImage, animeCover, totalEpisodes, episodeNumber, episodeTitle]);
+
+  // Prefetch next episode
   useEffect(() => {
     if (!animeId || !episodeNumber) return;
     const ctrl = new AbortController();
     const t = setTimeout(() => {
       fetch(
-        `/api/watch?id=${encodeURIComponent(animeId)}&episode=${episodeNumber + 1}&provider=animekai`,
+        `/api/watch?id=${encodeURIComponent(animeId)}&episode=${episodeNumber + 1}&provider=kickassanime`,
         { signal: ctrl.signal }
       ).catch(() => {});
     }, 2500);
     return () => { clearTimeout(t); ctrl.abort(); };
   }, [animeId, episodeNumber]);
 
+  function setQualityLevel(idx: number) {
+    setHlsLevel(idx);
+    if (hlsRef.current) hlsRef.current.currentLevel = idx;
+  }
+
   const cueCss = useMemo(() => {
-    const size = FONT_SIZE_PX[subStyle.fontSize];
+    const base = FONT_SIZE_PX[subStyle.fontSize];
+    const size = isFullscreen ? Math.round(base * 2.5) : base;
     const color = COLOR_HEX[subStyle.color];
     const bg = BG_RGBA[subStyle.bg];
     return `
@@ -203,13 +315,13 @@ export default function VideoPlayer({
         text-shadow: 0 1px 2px rgba(0,0,0,0.9);
       }
     `;
-  }, [subStyle]);
+  }, [subStyle, isFullscreen]);
 
   return (
     <div className="space-y-3">
       <style dangerouslySetInnerHTML={{ __html: cueCss }} />
       {!serverOnly && (
-        <div className="relative aspect-video w-full bg-black rounded-md overflow-hidden group">
+        <div className="relative aspect-video w-full bg-black rounded-xl overflow-hidden group ring-1 ring-border">
           <video
             ref={videoRef}
             controls
@@ -258,16 +370,30 @@ export default function VideoPlayer({
 
                 {menuTab === "quality" && (
                   <div className="space-y-1 max-h-60 overflow-auto">
-                    {sources.length === 0 && <p className="text-white/50">No sources.</p>}
-                    {sources.map((s, i) => (
-                      <MenuRow
-                        key={s.url + i}
-                        active={i === selected}
-                        onClick={() => setSelected(i)}
-                      >
-                        {s.quality || `Source ${i + 1}`}
-                      </MenuRow>
-                    ))}
+                    {hlsLevels.length > 0 ? (
+                      <>
+                        <MenuRow active={hlsLevel === -1} onClick={() => setQualityLevel(-1)}>
+                          Auto
+                        </MenuRow>
+                        {[...hlsLevels].reverse().map((l, ri) => {
+                          const idx = hlsLevels.length - 1 - ri;
+                          return (
+                            <MenuRow key={idx} active={hlsLevel === idx} onClick={() => setQualityLevel(idx)}>
+                              {l.height ? `${l.height}p` : `Source ${idx + 1}`}
+                            </MenuRow>
+                          );
+                        })}
+                      </>
+                    ) : (
+                      <>
+                        {sources.length === 0 && <p className="text-white/50">No sources.</p>}
+                        {sources.map((s, i) => (
+                          <MenuRow key={s.url + i} active={i === selected} onClick={() => setSelected(i)}>
+                            {s.quality || `Source ${i + 1}`}
+                          </MenuRow>
+                        ))}
+                      </>
+                    )}
                   </div>
                 )}
 
@@ -340,9 +466,9 @@ export default function VideoPlayer({
 
       <TrackSync videoRef={videoRef} selectedSub={selectedSub} />
 
-      {/* Toggles below player */}
+      {/* Toggles */}
       {!serverOnly && (
-        <div className="flex flex-wrap gap-2 items-center text-sm">
+        <div className="flex flex-wrap gap-2 items-center text-sm pt-1">
           <Toggle
             on={toggles.autoPlay}
             onClick={() => setToggles((t) => ({ ...t, autoPlay: !t.autoPlay }))}
@@ -405,7 +531,9 @@ function Toggle({ on, onClick, label }: { on: boolean; onClick: () => void; labe
       onClick={onClick}
       className={[
         "px-3 py-1.5 rounded-full border text-xs transition-colors flex items-center gap-1.5",
-        on ? "bg-accent border-accent text-white" : "bg-panel border-border hover:border-accent",
+        on
+          ? "bg-accent/15 border-accent/40 text-accent"
+          : "bg-panel border-border hover:border-borderHover text-muted",
       ].join(" ")}
     >
       <span className={on ? "opacity-100" : "opacity-50"}>{on ? "●" : "○"}</span>
@@ -493,8 +621,10 @@ function StyleRow<V extends string>({
 
 function chip(active: boolean) {
   return [
-    "px-2 py-1 rounded border text-xs transition-colors disabled:opacity-50",
-    active ? "bg-accent border-accent text-white" : "bg-panel border-border hover:border-accent",
+    "px-3 py-1.5 rounded-full border text-xs font-medium transition-colors disabled:opacity-50",
+    active
+      ? "bg-accent/15 border-accent/40 text-accent"
+      : "bg-panel border-border hover:border-borderHover text-muted hover:text-white",
   ].join(" ");
 }
 
